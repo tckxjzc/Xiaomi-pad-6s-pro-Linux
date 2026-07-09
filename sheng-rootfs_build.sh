@@ -53,20 +53,27 @@ for FLAVOUR in "${FLAVOURS[@]}"; do
 
         ROOTFS_IMG="${distro_type}_${DISTRO_VERSION}_${FLAVOUR}_${MODE}_${TIMESTAMP}.img"
 
-        # Step 1: Create image
+         # Step 1: Create image
         create_image "$IMAGE_SIZE" "$ROOTFS_IMG" "$UUID"
-        setup_chroot_mounts "$ROOTDIR"
+        
+        # ⬇️ 调整顺序 1：先注册清理陷阱（避免 debootstrap 出错时无法清理）
         # Register teardown trap for cleanup on failure
         trap_teardown "$ROOTDIR"
 
-        setup_dns "$ROOTDIR" 8.8.8.8 1.1.1.1 223.5.5.5
-
+        # ⬇️ 调整顺序 2：先拉取基础系统，让 debootstrap 创建出 rootdir 及其下的各种基础目录（如 /dev）
         # Step 2: Bootstrap
         echo "正在使用 debootstrap 拉取基础系统..."
         debootstrap --arch=arm64 "$DISTRO_VERSION" "$ROOTDIR" "$MIRROR"
 
+        # ⬇️ 调整顺序 3：此时 rootdir/dev 等目录已存在，再安全地执行挂载操作
+        setup_chroot_mounts "$ROOTDIR"
+
+        # ⬇️ 调整顺序 4：挂载完成后，再配置 DNS（因为 resolv.conf 此时才能正确写入或挂载）
+        setup_dns "$ROOTDIR" 8.8.8.8 1.1.1.1 223.5.5.5
+
         # Step 3: Base packages
         echo "正在安装基础环境组件..."
+
         chroot "$ROOTDIR" bash -c "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends systemd sudo vim wget curl network-manager openssh-server wpasupplicant dbus locales dialog"
 
         # Step 4: Chinese locale & input
