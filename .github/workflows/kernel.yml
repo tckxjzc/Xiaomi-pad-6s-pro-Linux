@@ -47,6 +47,8 @@ jobs:
 
       - name: 编译内核
         id: build
+        env:
+          ARCH: arm64
         run: |
           export CCACHE_DIR=/home/runner/.ccache
           export CCACHE_MAXSIZE=10G
